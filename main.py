@@ -1,3 +1,6 @@
+import statistics
+
+import scipy
 import yfinance
 import pandas as pd
 import numpy as np
@@ -5,8 +8,7 @@ import matplotlib.pyplot as plt
 import scipy.stats as st
 import seaborn as sn
 
-
-# TODO pip install yfinance, scipy
+np.random.seed(42)
 
 
 class Simulation:
@@ -23,6 +25,7 @@ class Simulation:
         self.get_data()
         # 1 B
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 1 B ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        # TODO add
         self.statical()
 
         self.remove_future()
@@ -30,31 +33,33 @@ class Simulation:
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 2 A ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         # TODO change days
         # simulation 1
-        self.create_window(days=882, interval=10, number_simulation=100)
+        self.create_window(days=880, interval=10, number_simulation=100)
+        self.windows.to_csv('1_windows.csv', index=False)
+
         profit = self.calculate_profit(start_money_arg=100, built_in=False)
-        results = self.check_question(profit, built_in=False)
-        print(results)
+        self.check_question(profit, '1', built_in=False)
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 2 B ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
-        self.create_window(days=882, interval=10, number_simulation=100)
+        self.create_window(days=880, interval=10, number_simulation=100)
+        self.windows.to_csv('2_windows.csv', index=False)
         profit = self.calculate_profit(start_money_arg=100, built_in=True)
-        results = self.check_question(profit, built_in=True)
-        print(results)
+        self.check_question(profit, '2', built_in=True)
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 2 C1 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         # simulation 1
-        self.create_window(days=882, interval=10, number_simulation=100)
+        self.create_window(days=880, interval=10, number_simulation=100)
+        self.windows.to_csv('3_windows.csv', index=False)
         profit = self.calculate_profit(start_money_arg=100, built_in=False)
-        results = self.check_question(profit, built_in=False)
-        print(results)
+        self.check_question(profit, '3', built_in=False)
 
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 2 C2 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 
-        self.create_window(days=882, interval=10, number_simulation=100)
+        self.create_window(days=880, interval=10, number_simulation=100)
+        self.windows.to_csv('4_windows.csv', index=False)
+
         profit = self.calculate_profit(start_money_arg=100, built_in=True)
-        results = self.check_question(profit, built_in=True)
-        print(results)
+        self.check_question(profit, '4', built_in=True)
 
     def get_data(self):
         """
@@ -110,7 +115,7 @@ class Simulation:
         for t in self.portfolio_composition:
             name = t[0]
             ticker = yfinance.Ticker(name)
-            data = ticker.history(interval="1d", start="1980-01-01", end="2018-03-26")
+            data = ticker.history(interval="1d", start="1980-01-01", end="2018-03-25")
             # TODO check multiply in 100
             data['return_%s' % (name)] = data['Close'].pct_change(1)
             self.tickets = self.tickets.join(data[[f'return_{name}']], how="outer").dropna()
@@ -118,7 +123,6 @@ class Simulation:
 
     def create_window(self, days=880, interval=10, number_simulation=10):
         size_window = days // interval
-
         for rep in range(number_simulation):
             window_add = []
             for window in range(size_window):
@@ -132,46 +136,73 @@ class Simulation:
             self.windows[f"{rep}_CSX"] = np.array(window_add)[:, 2]
             self.windows[f"{rep}_UNP"] = np.array(window_add)[:, 3]
 
+    @staticmethod
+    def cumprod(tickets):
+        com = ((tickets + 1).cumprod()).to_frame()
+        com = com.applymap(lambda x: (x - 1) * 100)
+        return np.sum(com[com >= 36]) > 0, com
+
     def calculate_profit(self, start_money_arg=100, built_in=False):
         flag_over = False
-        profit = pd.DataFrame(columns=['VMC', 'EMR', 'CSX', 'UNP'])
+        # profit = pd.DataFrame(columns=['VMC', 'EMR', 'CSX', 'UNP'])
+        profit = []
         # for all simulation
         for rep in range(self.windows.shape[1] // 4):
             window_check = self.windows[[f"{rep}_VMC", f"{rep}_EMR", f"{rep}_CSX", f"{rep}_UNP"]]
             list_add = []
             for ticket in window_check:
-                name = ticket.split("_")[1]
-                # init
-                end_money = start_money_arg
-                start_money = start_money_arg
-                for timestamp in range(len(window_check[ticket])):
-                    over = (end_money - start_money) / start_money
-                    if (window_check[ticket][timestamp] > 0.36 or over < 0.36) and built_in:
-                        flag_over = True
-                        break
-                    else:  # <= 0.36 / !built_in
-                        end_money += end_money * window_check[ticket][timestamp]
-                if flag_over:
-                    list_add.append(0.02)
+                ans, com = self.cumprod(window_check[ticket])
+                # name = ticket.split("_")[1]
+                # # init
+                # end_money = start_money_arg
+                # start_money = start_money_arg
+                # for timestamp in range(len(window_check[ticket])):
+                #     over = (end_money - start_money) / start_money
+                #     if (window_check[ticket][timestamp] > 0.36 or over > 0.36) and built_in:
+                #         flag_over = True
+                #         break
+                #     else:  # <= 0.36 / !built_in
+                #         end_money += end_money * window_check[ticket][timestamp]
+                if ans.values[0] and built_in:
+                    list_add.append(2)
                 else:
-                    list_add.append((end_money - start_money) / start_money)
+                    # if built_in:
+                    #     print(com[len(window_check[ticket]) - 1:len(window_check[ticket])].values[0])
+                    # list_add.append(((end_money - start_money) / start_money) * 100)
+                    list_add.append(com[len(window_check[ticket]) - 1:len(window_check[ticket])].values[0])
 
-            profit = profit.append({"VMC": list_add[0], "EMR": list_add[1], "CSX": list_add[2], "UNP": list_add[3]},
-                                   ignore_index=True)
+            # profit = profit.append({"VMC": list_add[0], "EMR": list_add[1], "CSX": list_add[2], "UNP": list_add[3]},
+            #                        ignore_index=True)
+            if (list_add[0] + list_add[1] + list_add[2] + list_add[3]) / 4 < 0 and built_in:
+                profit.append(0)
+            else:
+                profit.append((list_add[0] + list_add[1] + list_add[2] + list_add[3]) / 4)
         return profit
 
-    def check_question(self, profit, built_in=False):
-        results = {}
-        for key in profit.keys():
-            template = {"Name Stock": key,
-                        "Loss (<0)": np.round(np.sum(profit[key] < 0), 2),
-                        "0% profit": np.round(np.sum(profit[key] == 0), 2),
-                        "2% profit": np.round(np.sum(profit[key] == 0.02), 2),
-                        "(2%, 20%]": np.round(np.sum(profit[key][((0.2 > profit[key]) & (profit[key] < 0.2))]), 2),
-                        "(20%, 36%)": np.round(np.sum(profit[key][((0.2 > profit[key]) & (profit[key] < 0.36))]), 2),
-                        "Mean": np.round(profit[key].mean(), 2)}
-            results[key] = template
-        return results
+    def check_question(self, profit, index, built_in=False):
+        # results = {}
+        df = pd.DataFrame(profit)
+        df.to_csv(index + '.csv', header=False, index=False)
+
+        std = df.std().values[0]
+        mean = df.mean().values[0]
+        print(f"Mean = {mean}")
+        print(f"Std = {std}")
+        print(f"0% profit {scipy.stats.norm(mean, std).pdf(0)*100}")
+        print(f"2% profit {scipy.stats.norm(mean, std).pdf(2)*100}")
+        print(f"(2%, 20%] {(scipy.stats.norm(mean, std).cdf(20)-scipy.stats.norm(mean, std).cdf(2))*100}")
+        print(f"(20%, 36%){(scipy.stats.norm(mean, std).cdf(36)-scipy.stats.norm(mean, std).cdf(20))*100}")
+        print(f"Confidence Interval { scipy.stats.norm.interval(0.9, loc=mean, scale=std)}")
+
+        # for key in profit.keys():
+        #     template = {"Name Stock": key,
+        #                 "Loss (<0)": np.round(np.sum(profit[key] < 0), 2),
+        #                 "0% profit": np.round(np.sum(profit[key] == 0), 2),
+        #                 "2% profit": np.round(np.sum(profit[key] == 0.02), 2),
+        #                 "(2%, 20%]": np.round(np.sum(profit[key][((0.02 > profit[key]) & (profit[key] < 0.2))]), 2),
+        #                 "(20%, 36%)": np.round(np.sum(profit[key][((0.2 > profit[key]) & (profit[key] < 0.36))]), 2),
+        #                 "Mean": np.round(profit[key].mean(), 2)}
+        #     results[key] = template
 
 
 if __name__ == '__main__':
