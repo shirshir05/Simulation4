@@ -93,11 +93,16 @@ class Simulation:
             print(f"Std: {self.tickets['return_' + name].std()}")
             print(f"Correlation Close: {self.tickets['return_' + name].autocorr()}")
             print(f"Correlation Price: {self.tickets['price_' + name].autocorr()}")
-
+        plt.clf()
+        mask = np.zeros_like(self.tickets[["return_VMC", "return_EMR", "return_CSX", "return_UNP"]].cov(), dtype=np.bool)
+        mask[np.triu_indices_from(mask)] = True
         cov_matrix = self.tickets[["return_VMC", "return_EMR", "return_CSX", "return_UNP"]].cov()
         print(f"Covariance Close: \n{cov_matrix}")
-        sn.heatmap(cov_matrix, annot=True, fmt='g')
-        plt.savefig("File/covMatrix/cov_matrix_returns.png")
+        cmap = sn.diverging_palette(220, 20, as_cmap=True)
+        sn.heatmap(cov_matrix, mask=mask, cmap=cmap, center=0,
+            square=True, linewidths=.5, annot=True)
+        plt.title("Covariance Matrix")
+        plt.savefig("File_covMatrix_cov_matrix_returns.png")
 
     @staticmethod
     def show_price(ticker):
@@ -105,7 +110,7 @@ class Simulation:
         plt.xlabel("Date")
         plt.ylabel("Close")
         plt.title(f"{ticker.name} Price data")
-        plt.savefig("File/Price/" + ticker.name + ".png")
+        plt.savefig("File_Price_" + ticker.name + ".png")
 
     @staticmethod
     def calculate_returns(ticker):
@@ -114,13 +119,13 @@ class Simulation:
         plt.title(f"Histogram - {ticker.name} daily returns data")
         plt.xlabel("Daily returns %")
         plt.ylabel("Percent")
-        plt.savefig("File/DailyReturns/" + ticker.name + ".png")
+        plt.savefig("File_Profit_" + ticker.name + ".png")
 
     def calculate(self, name, profit):
         plt.figure(figsize=(10, 8))
         plt.hist(profit, density=True)
         plt.title(f"Histogram - Profit {name}")
-        plt.savefig("File/Profit/" + name + ".png")
+        plt.savefig("File_Profit_" + name + ".png")
 
     def remove_future(self):
         self.tickets = pd.DataFrame({})
@@ -184,6 +189,7 @@ class Simulation:
                     list_add.append(com[len(window_check[ticket]) - 1:len(window_check[ticket])].values[0])
 
             # profit = profit.append({"VMC": list_add[0], "EMR": list_add[1], "CSX": list_add[2], "UNP": list_add[3]},
+            #                        ignore_index=True)
             #                        ignore_index=True)
             if (list_add[0] + list_add[1] + list_add[2] + list_add[3]) / 4 < 0 and built_in:
                 profit.append(0)
