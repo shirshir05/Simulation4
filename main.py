@@ -239,7 +239,7 @@ class Simulation:
         #                 "(2%, 20%]": np.round(np.sum(profit[key][((0.02 > profit[key]) & (profit[key] < 0.2))]), 2),
         #                 "(20%, 36%)": np.round(np.sum(profit[key][((0.2 > profit[key]) & (profit[key] < 0.36))]), 2),
         #                 "Mean": np.round(profit[key].mean(), 2)}
-        #     results[key] = template
+        #     results[key] = templateS
 
 
 if __name__ == '__main__':
